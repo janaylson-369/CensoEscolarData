@@ -1,0 +1,13 @@
+# Ambientes virtuais
+venv/
+.venv/
+
+# Ficheiros compilados Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Dados pesados e bases de dados locais
+dados/
+*.csv
+*.sqlite3
