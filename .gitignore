@@ -9,5 +9,6 @@ __pycache__/
 
 # Dados pesados e bases de dados locais
 dados/
+db/
 *.csv
 *.sqlite3
