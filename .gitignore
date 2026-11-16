@@ -10,5 +10,6 @@ __pycache__/
 # Dados pesados e bases de dados locais
 dados/
 db/
+.vscode/
 *.csv
 *.sqlite3
