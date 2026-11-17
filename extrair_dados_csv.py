@@ -1,16 +1,19 @@
 import pandas as pd
-from sqlalchemy import create_engine
+import io
 from enviroment import enviroment
+import psycopg2
 
 ARQUIVO_ESCOLA = "dados/Tabela_Escola_2025_V2.csv" 
 ARQUIVO_MATRICULA = "dados/Tabela_Matricula_2025_V2.csv"
 NOME_TABELA = "tb_instituicao_ensino"
 
-DB_USER = enviroment.get("DB_USER")
-DB_PASSWORD = enviroment.get("DB_PASSWORD")
-DB_HOST = enviroment.get("DB_HOST")
-DB_PORT = enviroment.get("DB_PORT")
-DB_NAME = enviroment.get("DB_NAME")
+DB_CONFIGURACAO = {
+    "host": enviroment.get("DB_HOST"),
+    "port": int(enviroment.get("DB_PORT")),
+    "database": enviroment.get("DB_NAME"),
+    "user": enviroment.get("DB_USER"),
+    "password": enviroment.get("DB_PASSWORD")
+}
 
 lista_colunas = [
     "co_entidade",
@@ -49,8 +52,38 @@ print("colocando valores nulos com 0....")
 instituicao[campos_mat] = instituicao[campos_mat].fillna(0).astype(int)
 
 print(f"salvando no postgres()...")
-conexao = f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-engine = create_engine(conexao)
-instituicao.to_sql(NOME_TABELA, con=engine, if_exists="replace", index=False)
-
-print(f"\nconcluido com sucesso tem:{len(instituicao)} registros, migração para postgres concluida!!!!")
+conn = psycopg2.connect(**DB_CONFIGURACAO)
+curso = conn.cursor()
+try:
+    curso.execute(f"DROP TABLE IF EXISTS {NOME_TABELA};")
+    curso.execute(f"""CREATE TABLE {NOME_TABELA} (
+        id SERIAL PRIMARY KEY,
+        co_entidade INTEGER,
+        nu_ano_censo INTEGER,
+        no_entidade VARCHAR(255),
+        co_uf INTEGER,
+        sg_uf VARCHAR(2),
+        no_uf VARCHAR(255),
+        co_municipio INTEGER,
+        no_municipio VARCHAR(255),
+        qt_mat_bas INTEGER,
+        qt_mat_inf INTEGER,
+        qt_mat_fund INTEGER,
+        qt_mat_med INTEGER,
+        qt_mat_prof INTEGER,
+        qt_mat_eja INTEGER,
+        qt_mat_esp INTEGER,
+        ativo BOOLEAN DEFAULT TRUE,
+        created TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );""")
+    dados = io.StringIO()
+    instituicao.to_csv(dados,header=False, index=False)
+    dados.seek(0)
+    colunaDos = ','.join(lista_colunas)
+    curso.copy_expert(f"COPY {NOME_TABELA} ({colunaDos}) FROM STDIN WITH (FORMAT CSV) ", dados)
+    conn.commit()
+    print(f"\nconcluido com sucesso tem:{len(instituicao)} registros, migração para postgres concluida!!!!")
+except Exception as e:
+    print(f"erro na criação da tabela: {e}")
+    conn.rollback()
+    
